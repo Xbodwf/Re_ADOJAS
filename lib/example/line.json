@@ -1,0 +1,14 @@
+{
+    "settings": {
+      "artist": "Example Artist",
+      "song": "Example Song",
+      "author": "Re_ADOJAS",
+      "bpm": 120,
+      "offset": 0,
+      "difficulty": 3
+    },
+    "pathData": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
+    "actions": [],
+    "decorations": []
+  }
+  
