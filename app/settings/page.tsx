@@ -3,33 +3,36 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useTheme } from "next-themes"
+import { useI18n } from "@/lib/i18n/context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, Search, Monitor, Sun, Moon, Globe } from 'lucide-react'
+import { locales, localeNames, type Locale } from "@/lib/i18n/config"
 
 export default function SettingsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const { theme, setTheme } = useTheme()
+  const { locale, setLocale, t } = useI18n()
 
   const settingsCategories = [
     {
       id: "general",
-      title: "通用",
+      title: t('settings.categories.general'),
       icon: Monitor,
       settings: [
         {
           id: "appearance",
-          title: "外观",
-          description: "选择应用程序的主题",
+          title: t('settings.appearance.title'),
+          description: t('settings.appearance.description'),
           type: "theme",
         },
         {
           id: "language",
-          title: "语言",
-          description: "选择应用程序语言",
+          title: t('settings.language.title'),
+          description: t('settings.language.description'),
           type: "language",
         },
       ],
@@ -60,7 +63,7 @@ export default function SettingsPage() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
         </Link>
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">设置</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{t('settings.title')}</h1>
       </header>
 
       {/* Main Content */}
@@ -69,7 +72,7 @@ export default function SettingsPage() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
           <Input
-            placeholder="搜索设置..."
+            placeholder={t('settings.search')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-purple-500 dark:focus:border-purple-400 focus:ring-purple-500/20 dark:focus:ring-purple-400/20"
@@ -108,7 +111,7 @@ export default function SettingsPage() {
                         >
                           <div className="flex items-center gap-2">
                             <Monitor className="w-4 h-4" />
-                            跟随系统
+                            {t('settings.appearance.system')}
                           </div>
                         </SelectItem>
                         <SelectItem
@@ -117,7 +120,7 @@ export default function SettingsPage() {
                         >
                           <div className="flex items-center gap-2">
                             <Sun className="w-4 h-4" />
-                            浅色模式
+                            {t('settings.appearance.light')}
                           </div>
                         </SelectItem>
                         <SelectItem
@@ -126,7 +129,7 @@ export default function SettingsPage() {
                         >
                           <div className="flex items-center gap-2">
                             <Moon className="w-4 h-4" />
-                            深色模式
+                            {t('settings.appearance.dark')}
                           </div>
                         </SelectItem>
                       </SelectContent>
@@ -134,38 +137,23 @@ export default function SettingsPage() {
                   )}
 
                   {setting.type === "language" && (
-                    <Select defaultValue="zh-CN">
+                    <Select value={locale} onValueChange={(value: Locale) => setLocale(value)}>
                       <SelectTrigger className="bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white w-full sm:w-48 hover:bg-slate-50 dark:hover:bg-slate-600 focus:border-purple-500 dark:focus:border-purple-400 focus:ring-purple-500/20 dark:focus:ring-purple-400/20">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-lg dark:shadow-slate-900/50">
-                        <SelectItem
-                          value="zh-CN"
-                          className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 focus:bg-slate-100 dark:focus:bg-slate-700 cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Globe className="w-4 h-4" />
-                            简体中文
-                          </div>
-                        </SelectItem>
-                        <SelectItem
-                          value="en-US"
-                          className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 focus:bg-slate-100 dark:focus:bg-slate-700 cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Globe className="w-4 h-4" />
-                            English
-                          </div>
-                        </SelectItem>
-                        <SelectItem
-                          value="ja-JP"
-                          className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 focus:bg-slate-100 dark:focus:bg-slate-700 cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Globe className="w-4 h-4" />
-                            日本語
-                          </div>
-                        </SelectItem>
+                        {locales.map((loc) => (
+                          <SelectItem
+                            key={loc}
+                            value={loc}
+                            className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 focus:bg-slate-100 dark:focus:bg-slate-700 cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Globe className="w-4 h-4" />
+                              {localeNames[loc]}
+                            </div>
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   )}
@@ -181,8 +169,8 @@ export default function SettingsPage() {
               <div className="text-slate-400 dark:text-slate-500 mb-2">
                 <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
               </div>
-              <p className="text-slate-500 dark:text-slate-400 text-lg font-medium">未找到匹配的设置项</p>
-              <p className="text-slate-400 dark:text-slate-500 text-sm mt-2">尝试使用不同的关键词搜索</p>
+              <p className="text-slate-500 dark:text-slate-400 text-lg font-medium">{t('settings.noResults')}</p>
+              <p className="text-slate-400 dark:text-slate-500 text-sm mt-2">{t('settings.tryDifferentKeywords')}</p>
             </div>
           </div>
         )}
@@ -192,19 +180,21 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="text-slate-900 dark:text-white flex items-center gap-2">
               <div className="w-5 h-5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500"></div>
-              主题预览
+              {t('settings.themePreview.title')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* Light Theme Preview */}
               <div className="relative group cursor-pointer" onClick={() => setTheme("light")}>
-                <div className={`bg-white border-2 rounded-lg p-4 transition-all duration-200 hover:border-purple-400 hover:shadow-md ${
-                  theme === "light" ? "border-purple-500 shadow-md" : "border-slate-200"
-                }`}>
+                <div
+                  className={`bg-white border-2 rounded-lg p-4 transition-all duration-200 hover:border-purple-400 hover:shadow-md ${
+                    theme === "light" ? "border-purple-500 shadow-md" : "border-slate-200"
+                  }`}
+                >
                   <div className="flex items-center gap-2 mb-3">
                     <Sun className="w-4 h-4 text-amber-500" />
-                    <span className="text-sm font-medium text-slate-700">浅色模式</span>
+                    <span className="text-sm font-medium text-slate-700">{t('settings.appearance.light')}</span>
                   </div>
                   <div className="space-y-2">
                     <div className="h-2 bg-slate-200 rounded"></div>
@@ -219,12 +209,14 @@ export default function SettingsPage() {
 
               {/* Dark Theme Preview */}
               <div className="relative group cursor-pointer" onClick={() => setTheme("dark")}>
-                <div className={`bg-slate-800 border-2 rounded-lg p-4 transition-all duration-200 hover:border-purple-400 hover:shadow-md ${
-                  theme === "dark" ? "border-purple-500 shadow-md" : "border-slate-700"
-                }`}>
+                <div
+                  className={`bg-slate-800 border-2 rounded-lg p-4 transition-all duration-200 hover:border-purple-400 hover:shadow-md ${
+                    theme === "dark" ? "border-purple-500 shadow-md" : "border-slate-700"
+                  }`}
+                >
                   <div className="flex items-center gap-2 mb-3">
                     <Moon className="w-4 h-4 text-blue-400" />
-                    <span className="text-sm font-medium text-slate-300">深色模式</span>
+                    <span className="text-sm font-medium text-slate-300">{t('settings.appearance.dark')}</span>
                   </div>
                   <div className="space-y-2">
                     <div className="h-2 bg-slate-600 rounded"></div>
@@ -239,12 +231,14 @@ export default function SettingsPage() {
 
               {/* System Theme Preview */}
               <div className="relative group cursor-pointer" onClick={() => setTheme("system")}>
-                <div className={`bg-gradient-to-br from-white to-slate-800 border-2 rounded-lg p-4 transition-all duration-200 hover:border-purple-400 hover:shadow-md ${
-                  theme === "system" ? "border-purple-500 shadow-md" : "border-slate-300 dark:border-slate-600"
-                }`}>
+                <div
+                  className={`bg-gradient-to-br from-white to-slate-800 border-2 rounded-lg p-4 transition-all duration-200 hover:border-purple-400 hover:shadow-md ${
+                    theme === "system" ? "border-purple-500 shadow-md" : "border-slate-300 dark:border-slate-600"
+                  }`}
+                >
                   <div className="flex items-center gap-2 mb-3">
                     <Monitor className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">跟随系统</span>
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('settings.appearance.system')}</span>
                   </div>
                   <div className="space-y-2">
                     <div className="h-2 bg-gradient-to-r from-slate-200 to-slate-600 rounded"></div>

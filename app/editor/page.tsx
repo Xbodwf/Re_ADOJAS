@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Home, Settings, Save, Upload, Download, RotateCcw, Play, Pause } from "lucide-react"
 import Link from "next/link"
 import { useTheme } from "next-themes"
+import { useI18n } from "@/lib/i18n/context"
 import * as THREE from "three"
 import * as ADOFAI from "@/lib/ADOFAI/index.js"
 import Hjson from "hjson"
@@ -20,7 +21,7 @@ declare global {
     showNotification?: (type: string, message: string) => void
   }
   interface Navigator {
-    gpu?: any; // 声明实验性 gpu 属性
+    gpu?: any
   }
 }
 
@@ -99,12 +100,20 @@ class Previewer {
   private tileMaterials: THREE.MeshBasicMaterial[] | null = null
   private initialPinchDistance = 0
   private initialZoom = 0
+  private t: (key: string) => string
 
-  constructor(adofaiFile: any, container: HTMLElement, fpsCounter: HTMLElement, info: HTMLElement) {
+  constructor(
+    adofaiFile: any,
+    container: HTMLElement,
+    fpsCounter: HTMLElement,
+    info: HTMLElement,
+    t: (key: string) => string,
+  ) {
     this.container = container
     this.fpsCounter = fpsCounter
     this.info = info
     this.adofaiFile = adofaiFile
+    this.t = t
 
     // 绑定事件处理函数到实例
     this.boundEventHandlers = {
@@ -208,12 +217,14 @@ class Previewer {
     if (this.scene) {
       while (this.scene.children.length > 0) {
         const child = this.scene.children[0]
-        if (child.geometry) child.geometry.dispose()
-        if (child.material) {
-          if (Array.isArray(child.material)) {
-            child.material.forEach((mat: any) => mat.dispose())
+        // 类型断言为 Mesh 来访问 geometry 和 material 属性
+        const mesh = child as THREE.Mesh
+        if (mesh.geometry) mesh.geometry.dispose()
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach((mat: any) => mat.dispose())
           } else {
-            child.material.dispose()
+            mesh.material.dispose()
           }
         }
         this.scene.remove(child)
@@ -582,10 +593,10 @@ class Previewer {
       // 更新信息显示
       if (this.info) {
         this.info.innerHTML = `
-                    <div>Camera Position (${this.cameraPosition.x.toFixed(2)}, ${this.cameraPosition.y.toFixed(2)})</div>
-                    <div>Zoom ${this.zoom.toFixed(2)}</div>
-                    <div>Horizon ${this.visibleTiles.size}</div>
-                    <div>Total ${Object.keys(this.adofaiFile.tiles).length}</div>
+                    <div>${this.t("editor.info.cameraPosition")} (${this.cameraPosition.x.toFixed(2)}, ${this.cameraPosition.y.toFixed(2)})</div>
+                    <div>${this.t("editor.info.zoom")} ${this.zoom.toFixed(2)}</div>
+                    <div>${this.t("editor.info.horizon")} ${this.visibleTiles.size}</div>
+                    <div>${this.t("editor.info.total")} ${Object.keys(this.adofaiFile.tiles).length}</div>
                 `
       }
 
@@ -631,12 +642,37 @@ export default function EditorPage(): JSX.Element {
   const previewerRef = useRef<Previewer | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [adofaiFile, setAdofaiFile] = useState<any>(null)
-  const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  const [themeReady, setThemeReady] = useState(false)
+  const { theme, resolvedTheme } = useTheme()
+  const { t, mounted: i18nMounted } = useI18n()
+
+  // 确保组件和主题都已挂载
+  useEffect(() => {
+    setMounted(true)
+    // 延迟一点时间确保主题完全加载
+    const timer = setTimeout(() => {
+      setThemeReady(true)
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // 监听主题变化，确保主题正确应用
+  useEffect(() => {
+    if (mounted && resolvedTheme) {
+      // 强制重新渲染以确保主题正确应用
+      setThemeReady(false)
+      const timer = setTimeout(() => {
+        setThemeReady(true)
+      }, 50)
+      return () => clearTimeout(timer)
+    }
+  }, [mounted, resolvedTheme])
 
   // 导出文件功能
   const handleExport = useCallback((): void => {
     if (!adofaiFile) {
-      window.showNotification?.("error", "没有可导出的文件!")
+      window.showNotification?.("error", t("editor.notifications.noFileToExport"))
       return
     }
 
@@ -651,67 +687,71 @@ export default function EditorPage(): JSX.Element {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      window.showNotification?.("success", "文件导出成功!")
+      window.showNotification?.("success", t("editor.notifications.exportSuccess"))
     } catch (error) {
       console.error("Export error:", error)
-      window.showNotification?.("error", "文件导出失败!")
+      window.showNotification?.("error", t("editor.notifications.exportError"))
     }
-  }, [adofaiFile])
+  }, [adofaiFile, t])
 
   // 文件加载处理
-  const handleFileLoad = useCallback((event: React.ChangeEvent<HTMLInputElement>): void => {
-    const file = event.target.files?.[0]
-    if (!file) return
+  const handleFileLoad = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>): void => {
+      const file = event.target.files?.[0]
+      if (!file) return
 
-    setIsLoading(true)
-    const reader = new FileReader()
+      setIsLoading(true)
+      const reader = new FileReader()
 
-    reader.onload = async (e): Promise<void> => {
-      try {
-        const content = e.target?.result as string
+      reader.onload = async (e): Promise<void> => {
+        try {
+          const content = e.target?.result as string
 
-        // 使用ADOFAI.js解析文件
-        const level = new ADOFAI.Level(content, Hjson)
+          // 使用ADOFAI.js解析文件
+          const level = new ADOFAI.Level(content, Hjson)
 
-        level.on("load", (loadedLevel: any): void => {
-          loadedLevel.calculateTileCoordinates()
-          setAdofaiFile(loadedLevel)
+          level.on("load", (loadedLevel: any): void => {
+            loadedLevel.calculateTileCoordinates()
+            setAdofaiFile(loadedLevel)
 
-          // 关键修改：在创建新的Previewer之前，先清理旧的
-          if (previewerRef.current) {
-            console.log("Disposing old Previewer...")
-            previewerRef.current.dispose()
-            previewerRef.current = null
-          }
+            // 关键修改：在创建新的Previewer之前，先清理旧的
+            if (previewerRef.current) {
+              console.log("Disposing old Previewer...")
+              previewerRef.current.dispose()
+              previewerRef.current = null
+            }
 
-          // 创建新的Previewer
-          if (containerRef.current && fpsCounterRef.current && infoRef.current) {
-            previewerRef.current = new Previewer(
-              loadedLevel,
-              containerRef.current,
-              fpsCounterRef.current,
-              infoRef.current,
-            )
-          }
-          window.showNotification?.("success", "载入关卡成功!")
-        })
+            // 创建新的Previewer
+            if (containerRef.current && fpsCounterRef.current && infoRef.current) {
+              previewerRef.current = new Previewer(
+                loadedLevel,
+                containerRef.current,
+                fpsCounterRef.current,
+                infoRef.current,
+                t,
+              )
+            }
+            window.showNotification?.("success", t("editor.notifications.loadSuccess"))
+          })
 
-        await level.load()
-      } catch (error) {
-        window.showNotification?.("error", "载入关卡失败!")
-        console.error(error)
-      } finally {
+          await level.load()
+        } catch (error) {
+          window.showNotification?.("error", t("editor.notifications.loadError"))
+          console.error(error)
+        } finally {
+          setIsLoading(false)
+        }
+      }
+
+      reader.onerror = (): void => {
+        window.showNotification?.("error", t("editor.notifications.fileReadError"))
         setIsLoading(false)
       }
-    }
 
-    reader.onerror = (): void => {
-      window.showNotification?.("error", "文件读取失败!")
-      setIsLoading(false)
-    }
-
-    reader.readAsText(file)
-  }, [])
+      reader.readAsText(file)
+    },
+    [t],
+  )
 
   // 键盘快捷键
   useEffect(() => {
@@ -728,6 +768,8 @@ export default function EditorPage(): JSX.Element {
 
   // 初始化示例数据
   useEffect(() => {
+    if (!mounted || !i18nMounted || !themeReady) return
+
     const initializeExample = async (): Promise<void> => {
       try {
         const level = new ADOFAI.Level(example, Hjson)
@@ -747,20 +789,21 @@ export default function EditorPage(): JSX.Element {
               containerRef.current,
               fpsCounterRef.current,
               infoRef.current,
+              t,
             )
           }
-          window.showNotification?.("success", "载入关卡成功!")
+          window.showNotification?.("success", t("editor.notifications.loadSuccess"))
         })
 
         await level.load()
       } catch (error) {
-        window.showNotification?.("error", "载入关卡失败!")
+        window.showNotification?.("error", t("editor.notifications.loadError"))
         console.error(error)
       }
     }
 
     initializeExample()
-  }, [])
+  }, [mounted, i18nMounted, themeReady, t])
 
   // 监听窗口大小变化，触发Previewer的resize
   useEffect(() => {
@@ -794,34 +837,45 @@ export default function EditorPage(): JSX.Element {
     }
   }, [])
 
-  // 根据主题设置背景色
-  const editorBgClass = theme === "dark" ? "bg-slate-900" : "bg-slate-50"
+  // 如果还没有完全挂载，显示加载状态
+  if (!mounted || !i18nMounted || !themeReady) {
+    return (
+      <div className="h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+        <div className="text-slate-600 dark:text-slate-400">{t("common.loading")}</div>
+      </div>
+    )
+  }
 
-  const headerBgClass = theme === "dark" ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"
-
-  const sidebarBgClass = theme === "dark" ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"
-
-  const footerBgClass =
-    theme === "dark" ? "bg-slate-800 border-slate-700 text-slate-400" : "bg-white border-slate-200 text-slate-600"
+  // 使用 resolvedTheme 来确保获取到正确的主题值
+  const currentTheme = resolvedTheme || theme
+  const isDark = currentTheme === "dark"
 
   return (
-    <div className={`h-screen ${editorBgClass} flex flex-col overflow-hidden`}>
+    <div className={`h-screen ${isDark ? "bg-slate-900" : "bg-slate-50"} flex flex-col overflow-hidden`}>
       <NotificationSystem />
 
       {/* Header */}
-      <header className={`${headerBgClass} border-b px-4 py-3 flex justify-between items-center flex-shrink-0`}>
+      <header
+        className={`${
+          isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"
+        } border-b px-4 py-3 flex justify-between items-center flex-shrink-0`}
+      >
         <div className="flex items-center gap-4">
           <Link href="/">
             <Button
               variant="ghost"
               size="sm"
-              className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+              className={`${
+                isDark
+                  ? "text-slate-300 hover:text-white hover:bg-slate-700"
+                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+              }`}
             >
               <Home className="w-4 h-4 mr-2" />
-              Home
+              {t("common.home")}
             </Button>
           </Link>
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Re_ADOJAS</h1>
+          <h1 className={`text-lg font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>{t("editor.title")}</h1>
         </div>
 
         <div className="flex items-center gap-2">
@@ -829,37 +883,53 @@ export default function EditorPage(): JSX.Element {
           <Button
             variant="ghost"
             size="sm"
-            className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+            className={`${
+              isDark
+                ? "text-slate-300 hover:text-white hover:bg-slate-700"
+                : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+            }`}
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading}
             id="butload"
           >
             <Upload className="w-4 h-4 mr-2" />
-            {isLoading ? "Loading..." : "Load File"}
+            {isLoading ? t("common.loading") : t("editor.loadFile")}
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+            className={`${
+              isDark
+                ? "text-slate-300 hover:text-white hover:bg-slate-700"
+                : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+            }`}
             onClick={handleExport}
             disabled={!adofaiFile}
           >
             <Download className="w-4 h-4 mr-2" />
-            Export
+            {t("editor.export")}
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+            className={`${
+              isDark
+                ? "text-slate-300 hover:text-white hover:bg-slate-700"
+                : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+            }`}
           >
             <Save className="w-4 h-4 mr-2" />
-            Save
+            {t("editor.save")}
           </Button>
           <Link href="/settings">
             <Button
               variant="ghost"
               size="sm"
-              className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+              className={`${
+                isDark
+                  ? "text-slate-300 hover:text-white hover:bg-slate-700"
+                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+              }`}
             >
               <Settings className="w-4 h-4" />
             </Button>
@@ -870,45 +940,75 @@ export default function EditorPage(): JSX.Element {
       {/* Main Editor Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
-        <aside className={`w-64 ${sidebarBgClass} border-r p-4 flex-shrink-0 overflow-y-auto`}>
+        <aside
+          className={`w-64 ${
+            isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"
+          } border-r p-4 flex-shrink-0 overflow-y-auto`}
+        >
           <div className="space-y-4">
             <div>
-              <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Level Info</h3>
-              <div className="space-y-1 text-sm text-slate-500 dark:text-slate-400">
-                <div>Tiles: {adofaiFile?.tiles ? Object.keys(adofaiFile.tiles).length : "Loading..."}</div>
-                <div>BPM: {adofaiFile?.getMetadata?.()?.bpm || 120}</div>
-                <div>Offset: {adofaiFile?.getMetadata?.()?.offset || 0}ms</div>
+              <h3 className={`text-sm font-medium ${isDark ? "text-slate-300" : "text-slate-700"} mb-2`}>
+                {t("editor.levelInfo")}
+              </h3>
+              <div className={`space-y-1 text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                <div>
+                  {t("editor.tiles")}: {adofaiFile?.tiles ? Object.keys(adofaiFile.tiles).length : t("common.loading")}
+                </div>
+                <div>
+                  {t("editor.bpm")}: {adofaiFile?.settings?.bpm || "unknown"}
+                </div>
+                <div>
+                  {t("editor.offset")}: {adofaiFile?.settings?.offset || 0}ms
+                </div>
               </div>
             </div>
 
             <div>
-              <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Tools</h3>
+              <h3 className={`text-sm font-medium ${isDark ? "text-slate-300" : "text-slate-700"} mb-2`}>
+                {t("editor.tools")}
+              </h3>
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-transparent"
+                  className={`${
+                    isDark
+                      ? "border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
+                      : "border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                  } bg-transparent`}
                 >
-                  Select
+                  {t("editor.select")}
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-transparent"
+                  className={`${
+                    isDark
+                      ? "border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
+                      : "border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                  } bg-transparent`}
                 >
-                  Move
+                  {t("editor.move")}
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-transparent"
+                  className={`${
+                    isDark
+                      ? "border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
+                      : "border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                  } bg-transparent`}
                 >
-                  Add Tile
+                  {t("editor.addTile")}
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-transparent flex-1"
+                  className={`${
+                    isDark
+                      ? "border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
+                      : "border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                  } bg-transparent flex-1`}
                 >
                   <RotateCcw className="w-4 h-4" />
                 </Button>
@@ -916,19 +1016,29 @@ export default function EditorPage(): JSX.Element {
             </div>
 
             <div>
-              <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Playback</h3>
+              <h3 className={`text-sm font-medium ${isDark ? "text-slate-300" : "text-slate-700"} mb-2`}>
+                {t("editor.playback")}
+              </h3>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-transparent flex-1"
+                  className={`${
+                    isDark
+                      ? "border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
+                      : "border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                  } bg-transparent flex-1`}
                 >
                   <Play className="w-4 h-4" />
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-transparent flex-1"
+                  className={`${
+                    isDark
+                      ? "border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
+                      : "border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                  } bg-transparent flex-1`}
                 >
                   <Pause className="w-4 h-4" />
                 </Button>
@@ -956,28 +1066,32 @@ export default function EditorPage(): JSX.Element {
             id="info"
             className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm rounded-lg p-3 text-white text-sm space-y-1"
           >
-            <div>Camera Position (0.00, 0.00)</div>
-            <div>Zoom 1.00</div>
-            <div>Horizon 0</div>
-            <div>Total 0</div>
+            <div>{t("editor.info.cameraPosition")} (0.00, 0.00)</div>
+            <div>{t("editor.info.zoom")} 1.00</div>
+            <div>{t("editor.info.horizon")} 0</div>
+            <div>{t("editor.info.total")} 0</div>
           </div>
 
           {/* Controls Help */}
           <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-sm rounded-lg p-2 text-white text-xs">
-            <div>Left Click + Drag: Pan</div>
-            <div>Scroll: Zoom</div>
-            <div>Ctrl + O: Open File</div>
+            <div>{t("editor.controls.pan")}</div>
+            <div>{t("editor.controls.zoom")}</div>
+            <div>{t("editor.controls.openFile")}</div>
           </div>
         </main>
       </div>
 
       {/* Status Bar */}
-      <footer className={`${footerBgClass} border-t px-4 py-2 text-sm flex-shrink-0`}>
+      <footer
+        className={`${
+          isDark ? "bg-slate-800 border-slate-700 text-slate-400" : "bg-white border-slate-200 text-slate-600"
+        } border-t px-4 py-2 text-sm flex-shrink-0`}
+      >
         <div className="flex justify-between items-center">
           <div>
-            Re_ADOJAS {version.label} {version.tag}
+            Re_ADOJAS {t("home.version")} {version.tag}
           </div>
-          <div>Insider</div>
+          <div>{t("editor.status.insider")}</div>
         </div>
       </footer>
     </div>

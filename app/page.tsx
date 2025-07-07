@@ -1,9 +1,28 @@
+"use client"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Settings, Code, CuboidIcon as Cube, Github } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { version } from "@/control/VersionManager"
+import { useI18n } from "@/lib/i18n/context"
 
 export default function HomePage() {
+  const { t, mounted } = useI18n()
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  // 在客户端挂载完成前显示加载状态
+  if (!isClient || !mounted) {
+    return (
+      <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-purple-50 to-slate-50 dark:from-slate-900 dark:via-purple-900 dark:to-slate-900 flex items-center justify-center">
+        <div className="text-slate-600 dark:text-slate-400">Loading...</div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-purple-50 to-slate-50 dark:from-slate-900 dark:via-purple-900 dark:to-slate-900">
       {/* Header */}
@@ -50,11 +69,11 @@ export default function HomePage() {
           {/* Project Info */}
           <div className="space-y-3 sm:space-y-4">
             <h1 className="text-4xl sm:text-6xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Re_ADOJAS
+              {t("home.title")}
             </h1>
             <div className="space-y-2 text-slate-600 dark:text-slate-300">
               <p className="text-lg sm:text-xl">
-                {version.label} <span className="text-purple-400 font-mono">{version.tag}</span>
+                {t("home.version")} <span className="text-purple-400 font-mono">{version.tag}</span>
               </p>
             </div>
           </div>
@@ -64,7 +83,7 @@ export default function HomePage() {
             <Link href="/editor">
               <Button className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6 sm:px-8 py-2 sm:py-3 text-base sm:text-lg">
                 <Code className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                Open Editor
+                {t("home.openEditor")}
               </Button>
             </Link>
           </div>
@@ -73,7 +92,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="text-center py-4 sm:py-6 text-slate-600 dark:text-slate-400 px-4">
-        {/*<p className="text-sm sm:text-base">Built with ❤️ using Next.js and THREE.js</p>*/}
+        {/*<p className="text-sm sm:text-base">{t('home.builtWith')}</p>*/}
       </footer>
     </div>
   )
