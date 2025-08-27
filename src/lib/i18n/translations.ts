@@ -16,10 +16,9 @@ export const translations = {
     // 主页
     home: {
       title: "Re_ADOJAS",
-      subtitle: "一个现代化的3D编辑器",
-      openEditor: "打开编辑器",
+      subtitle: "一个ADOFAI播放器",
+      openEditor: "打开播放编辑器",
       version: "版本：",
-      builtWith: "使用 ❤️ 构建，基于 Next.js 和 THREE.js",
     },
     // 编辑器
     editor: {
@@ -106,7 +105,6 @@ export const translations = {
       subtitle: "A modern 3D editor",
       openEditor: "Open Editor",
       version: "Version:",
-      builtWith: "Built with ❤️ using Next.js and THREE.js",
     },
     // Editor
     editor: {
@@ -193,7 +191,6 @@ export const translations = {
       subtitle: "モダンな3Dエディター",
       openEditor: "エディターを開く",
       version: "バージョン：",
-      builtWith: "Next.jsとTHREE.jsで❤️を込めて構築",
     },
     // エディター
     editor: {
